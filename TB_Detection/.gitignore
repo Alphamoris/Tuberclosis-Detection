@@ -1,0 +1,65 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
+venv/
+env/
+ENV/
+
+# Jupyter notebooks
+.ipynb_checkpoints
+*.ipynb
+
+# IDE files
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Dataset files
+data/
+*.zip
+*.h5
+*.hdf5
+
+# Model output
+output/
+models/
+logs/
+results/
+visualizations/
+
+# Tensorflow logs
+logs/
+tensorboard/
+
+# Project-specific
+kaggle.json
+
+# AWS
+.aws/
+credentials
+.env
+
+# Misc
+.DS_Store
+Thumbs.db 
