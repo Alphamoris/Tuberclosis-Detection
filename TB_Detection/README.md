@@ -310,12 +310,6 @@ python TB_Detection/setup.py
 python TB_Detection/train.py --model_name all
 ```
 
-#### Issue: "TypeError: Object of type int64 is not JSON serializable"
-**Solution:** This error is fixed in the latest version. The training script now includes a custom JSON encoder to handle NumPy data types.
-
-#### Issue: Import errors with modules not found
-**Solution:**
-```bash
 # Make sure you're running scripts from the project root
 cd /path/to/TB_Detection
 python train.py
