@@ -3,6 +3,7 @@ import zipfile
 import tensorflow as tf
 from sklearn.model_selection import train_test_split
 import numpy as np
+import glob
 
 class DataLoader:
     def __init__(self, dataset_path=None, dataset_name='yasserhessein/tuberculosis-chest-x-rays-images'):
@@ -14,7 +15,6 @@ class DataLoader:
         
     def download_dataset(self):
         try:
-            # Import kaggle only when needed
             import kaggle
             kaggle.api.authenticate()
             kaggle.api.dataset_download_files(self.dataset_name, path=self.dataset_path, unzip=True)
@@ -33,14 +33,34 @@ class DataLoader:
             zip_ref.extractall(self.dataset_path)
     
     def organize_data(self, tb_dir='TB', normal_dir='Normal', test_size=0.2, valid_size=0.2, random_state=42):
-        tb_images = [os.path.join(tb_dir, img) for img in os.listdir(tb_dir) if img.endswith(('.png', '.jpg', '.jpeg'))]
-        normal_images = [os.path.join(normal_dir, img) for img in os.listdir(normal_dir) if img.endswith(('.png', '.jpg', '.jpeg'))]
+        print(f"Looking for TB images in: {tb_dir}")
+        print(f"Looking for Normal images in: {normal_dir}")
+        
+        tb_images = glob.glob(os.path.join(tb_dir, '**', '*.jpg'), recursive=True)
+        tb_images.extend(glob.glob(os.path.join(tb_dir, '**', '*.jpeg'), recursive=True))
+        tb_images.extend(glob.glob(os.path.join(tb_dir, '**', '*.png'), recursive=True))
+        
+        normal_images = glob.glob(os.path.join(normal_dir, '**', '*.jpg'), recursive=True)
+        normal_images.extend(glob.glob(os.path.join(normal_dir, '**', '*.jpeg'), recursive=True))
+        normal_images.extend(glob.glob(os.path.join(normal_dir, '**', '*.png'), recursive=True))
+        
+        print(f"Found {len(tb_images)} TB images and {len(normal_images)} Normal images")
+        
+        if len(tb_images) == 0 or len(normal_images) == 0:
+            print("ERROR: No images found in one of the directories!")
+            return None
+        
+        test_size = min(test_size, 0.3) 
+        valid_size = min(valid_size, 0.3) 
         
         tb_train_valid, tb_test = train_test_split(tb_images, test_size=test_size, random_state=random_state)
         tb_train, tb_valid = train_test_split(tb_train_valid, test_size=valid_size/(1-test_size), random_state=random_state)
         
         normal_train_valid, normal_test = train_test_split(normal_images, test_size=test_size, random_state=random_state)
         normal_train, normal_valid = train_test_split(normal_train_valid, test_size=valid_size/(1-test_size), random_state=random_state)
+        
+        print(f"Split sizes - TB: {len(tb_train)} train, {len(tb_valid)} valid, {len(tb_test)} test")
+        print(f"Split sizes - Normal: {len(normal_train)} train, {len(normal_valid)} valid, {len(normal_test)} test")
         
         os.makedirs(os.path.join(self.train_dir, 'TB'), exist_ok=True)
         os.makedirs(os.path.join(self.train_dir, 'Normal'), exist_ok=True)
@@ -56,11 +76,17 @@ class DataLoader:
         ]:
             for img_path in tb_imgs:
                 dest = os.path.join(self.dataset_path, split, 'TB', os.path.basename(img_path))
-                tf.io.gfile.copy(img_path, dest, overwrite=True)
+                try:
+                    tf.io.gfile.copy(img_path, dest, overwrite=True)
+                except Exception as e:
+                    print(f"Error copying {img_path}: {e}")
                 
             for img_path in normal_imgs:
                 dest = os.path.join(self.dataset_path, split, 'Normal', os.path.basename(img_path))
-                tf.io.gfile.copy(img_path, dest, overwrite=True)
+                try:
+                    tf.io.gfile.copy(img_path, dest, overwrite=True)
+                except Exception as e:
+                    print(f"Error copying {img_path}: {e}")
                 
         return {
             'train': {'TB': len(tb_train), 'Normal': len(normal_train)},

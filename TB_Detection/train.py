@@ -6,6 +6,16 @@ import json
 import time
 from datetime import datetime
 
+class NumpyEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, np.integer):
+            return int(obj)
+        elif isinstance(obj, np.floating):
+            return float(obj)
+        elif isinstance(obj, np.ndarray):
+            return obj.tolist()
+        return super(NumpyEncoder, self).default(obj)
+
 from utils.data_loader import DataLoader
 from utils.preprocessor import ImagePreprocessor
 from utils.augmentation import DataAugmenter
@@ -43,12 +53,18 @@ def train_model(args):
                 valid_size=args.valid_size
             )
             
+            if dataset_stats is None:
+                print(f"Error: Failed to organize dataset. Please check data directory structure.")
+                return None
+                
             print("\nDataset statistics:")
             for split, stats in dataset_stats.items():
                 print(f"  {split}: {stats}")
         else:
             print(f"Error: TB and/or Normal directories not found in {args.data_dir}")
-            return
+            print(f"Current directories in {args.data_dir}: {os.listdir(args.data_dir)}")
+            print("Please organize your data with TB/ and Normal/ folders containing X-ray images")
+            return None
     
     print("\nCreating TensorFlow datasets...")
     train_ds, valid_ds, test_ds = data_loader.create_tf_datasets(
@@ -157,7 +173,7 @@ def train_model(args):
     
     results_file = os.path.join(output_dir, 'evaluation_results.json')
     with open(results_file, 'w') as f:
-        json.dump(evaluation_results, f, indent=4)
+        json.dump(evaluation_results, f, indent=4, cls=NumpyEncoder)
         
     print(f"\nEvaluation results saved to {results_file}")
     
@@ -195,12 +211,23 @@ def train_all_models(args):
         args.model_name = model_name
         print(f"\n\n{'='*20} Training {model_name} {'='*20}\n")
         model_results = train_model(args)
+        
+        if model_results is None:
+            print(f"Training failed for {model_name}, skipping to next model...")
+            continue
+            
         results[model_name] = {
             'model_path': model_results['model_path'],
             'evaluation_results': model_results['evaluation_results'],
             'training_time': model_results['training_time']
         }
     
+    if not results:
+        print("\n\n" + "="*50)
+        print("No models were successfully trained. Please check your dataset structure.")
+        print("="*50)
+        return None
+        
     print("\n\n" + "="*50)
     print("All models trained successfully!")
     print("="*50)

@@ -1,45 +1,37 @@
-import streamlit as st
-import tensorflow as tf
-import numpy as np
-import cv2
 import os
-import time
-from PIL import Image
-import io
 import sys
-import os
+import time
+import numpy as np
+import tensorflow as tf
+import cv2
+from PIL import Image
+import streamlit as st
 
-# Try different import approaches to be more resilient
 current_dir = os.path.dirname(os.path.abspath(__file__))
 parent_dir = os.path.dirname(current_dir)
 project_root = os.path.dirname(parent_dir)
 
-# Add both potential paths to sys.path
 sys.path.append(parent_dir)
 sys.path.append(project_root)
 
-# Try different import approaches
 try:
-    # Try direct import first (if running from TB_Detection/)
     from utils.preprocessor import ImagePreprocessor
     print("Successfully imported using direct path")
 except ImportError:
     try:
-        # Try with TB_Detection prefix (if running from parent directory)
         from TB_Detection.utils.preprocessor import ImagePreprocessor
         print("Successfully imported using TB_Detection prefix")
     except ImportError:
-        # Last resort - try relative import
         sys.path.append(os.path.join(parent_dir, 'utils'))
         from preprocessor import ImagePreprocessor
         print("Successfully imported using utils path")
 
 class TBDetectionApp:
     def __init__(self, model_paths=None, model_names=None):
-        # Check if we can access output/models relative to the current script location
+        self.setup_directories()
+        
         local_model_dir = os.path.join(parent_dir, "output", "models")
         
-        # Use absolute paths with project structure detection
         self.model_paths = model_paths or {
             "ResNet50": os.path.join(local_model_dir, "resnet50_final.h5"),
             "VGG16": os.path.join(local_model_dir, "vgg16_final.h5"),
@@ -49,10 +41,24 @@ class TBDetectionApp:
         self.models = {}
         self.preprocessors = {}
         self.current_model_name = None
+    
+    def setup_directories(self):
+        dirs_to_create = [
+            os.path.join(parent_dir, "output"),
+            os.path.join(parent_dir, "output", "models")
+        ]
         
+        for directory in dirs_to_create:
+            if not os.path.exists(directory):
+                os.makedirs(directory)
+                print(f"Created directory: {directory}")
+                
     def load_models(self):
+        models_found = False
+        
         for name, path in self.model_paths.items():
             if os.path.exists(path):
+                models_found = True
                 try:
                     self.models[name] = tf.keras.models.load_model(path)
                     if name == "ResNet50":
@@ -61,10 +67,13 @@ class TBDetectionApp:
                         self.preprocessors[name] = ImagePreprocessor(model_name="vgg16")
                     elif name == "EfficientNetB0":
                         self.preprocessors[name] = ImagePreprocessor(model_name="efficientnet")
+                    print(f"Successfully loaded model: {name} from {path}")
                 except Exception as e:
                     st.error(f"Error loading model {name}: {str(e)}")
             else:
                 st.warning(f"Model file not found for {name}: {path}")
+        
+        return models_found
                 
     def get_available_models(self):
         return [name for name in self.model_names if name in self.models]
@@ -121,14 +130,31 @@ def main():
     """)
     
     with st.spinner("Loading models..."):
-        app.load_models()
+        models_found = app.load_models()
         
     available_models = app.get_available_models()
     
     if not available_models:
         st.error("No models are available. Please check model paths and files.")
+        
+        st.subheader("How to Train Models")
         st.info("You need to train models first using the train.py script before using the app.")
-        st.code("python train.py --model_name resnet50 --epochs 50 --batch_size 32 --use_class_weights --fine_tune")
+        
+        st.code("""
+# Train ResNet50 model
+python train.py --model_name resnet50 --epochs 50 --batch_size 32 --use_class_weights --fine_tune
+
+# Train VGG16 model
+python train.py --model_name vgg16 --epochs 50 --batch_size 32 --use_class_weights --fine_tune
+
+# Train EfficientNetB0 model
+python train.py --model_name efficientnet --epochs 50 --batch_size 32 --use_class_weights --fine_tune
+        """)
+
+        st.subheader("Expected Model Paths")
+        for name, path in app.model_paths.items():
+            st.code(f"{name}: {path}")
+            
         return
         
     with st.sidebar:
@@ -214,26 +240,6 @@ def main():
                                 """)
             except Exception as e:
                 st.error(f"Error processing image: {str(e)}")
-    
-    if not uploaded_file or not available_models:
-        with col2:
-            st.subheader("Detection Results")
-            if not available_models:
-                st.warning("No trained models are available. Train models first!")
-            else:
-                st.write("Please upload an image to get prediction results.")
-    
-    st.divider()
-    st.markdown("""
-    ### How to use this tool
-    1. Upload a chest X-ray image using the file uploader
-    2. Select the desired AI model from the sidebar
-    3. Click the "Predict" button to analyze the image
-    4. View the results showing TB probability
-    
-    ### About Tuberculosis
-    Tuberculosis (TB) is an infectious disease caused by _Mycobacterium tuberculosis_. It primarily affects the lungs but can also affect other organs. Early detection of TB through chest X-rays is important for timely treatment and prevention of transmission.
-    """)
 
 if __name__ == "__main__":
     main() 
